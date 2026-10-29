@@ -1,9 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { DbService } from './db.service.js';
+import type { OrbSettings } from './orb-settings.js';
 
 export interface Item {
   id: number;
   title: string;
+}
+
+export interface Preset {
+  id: number;
+  name: string;
+  settings: OrbSettings;
 }
 
 @Injectable()
@@ -34,5 +41,26 @@ export class AppService {
       [title],
     );
     return rows[0];
+  }
+
+  async listPresets(): Promise<Preset[]> {
+    this.requireDb();
+    return this.db.query<Preset>(
+      'SELECT id, name, settings FROM presets ORDER BY id DESC LIMIT 50',
+    );
+  }
+
+  async addPreset(name: string, settings: OrbSettings): Promise<Preset> {
+    this.requireDb();
+    const rows = await this.db.query<Preset>(
+      'INSERT INTO presets (name, settings) VALUES ($1, $2) RETURNING id, name, settings',
+      [name, settings],
+    );
+    return rows[0];
+  }
+
+  private requireDb() {
+    if (!this.db.enabled)
+      throw new ServiceUnavailableException('presets need DATABASE_URL');
   }
 }
